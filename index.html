@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Golden Eagle Programme — AI Learning Companion</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#080604" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Golden Eagle" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand">
+    <div class="brand-logo">
+      <img src="eagle-banner.png" alt="Golden Eagle" class="eagle-svg" />
+    </div>
+    <div class="brand-text">
+      <span class="brand-title">Golden Eagle</span>
+      <span class="brand-sub">— Programme —</span>
+    </div>
+  </div>
+
+  <nav class="tabs">
+    <button data-view="dashboard" class="active">Dashboard</button>
+    <button data-view="plan">Learning Plan</button>
+    <button data-view="post">LinkedIn Post</button>
+  </nav>
+
+  <!-- PWA install button -->
+  <div class="install-wrap" id="install-wrap" style="display:none;">
+    <button class="btn install-btn" id="install-btn" title="Install as app">
+      <span class="install-icon">⬇</span>
+      <span class="install-label">Install App</span>
+    </button>
+  </div>
+</header>
+
+<main>
+  <!-- DASHBOARD -->
+  <section id="view-dashboard" class="view active">
+    <div class="hero" style="text-align:center; padding: 36px 32px;">
+      <img src="eagle-banner.png" alt="Golden Eagle Programme" class="hero-eagle" />
+      <h1 style="font-size:30px; letter-spacing:3px; margin:10px 0 6px;">GOLDEN EAGLE PROGRAMME</h1>
+      <div style="width:220px; height:1px; background:linear-gradient(90deg,transparent,#d4941e,transparent); margin:10px auto 16px;"></div>
+      <p style="max-width:600px; margin:0 auto;">Your hyper-personalised AI learning companion. Build a plan tuned to your goal &amp; curriculum stage, then share your journey on LinkedIn — branded image + ad copy, on your chosen cadence.</p>
+    </div>
+
+    <div class="dashboard-grid">
+      <div class="cta-tile" data-jump="plan">
+        <h3>① Personalised Learning Plan</h3>
+        <p>Map the 24-week Golden Eagle curriculum to YOUR ambition. Pick the phases that matter, declare your AI goal, and get a week-by-week plan with deliverables.</p>
+        <div class="arrow">Build my plan →</div>
+      </div>
+      <div class="cta-tile" data-jump="post">
+        <h3>② LinkedIn Post Generator</h3>
+        <p>Upload your photo, describe what you learned, and get a branded image + ad copy. Pick how often to post — daily, weekly, milestones.</p>
+        <div class="arrow">Generate a post →</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 18px;">
+      <h2>The 24-Week Curriculum at a glance</h2>
+      <div id="curriculum-overview" class="phase-grid"></div>
+    </div>
+  </section>
+
+  <!-- LEARNING PLAN -->
+  <section id="view-plan" class="view">
+    <div class="hero">
+      <h1>Build your Personalised Learning Plan</h1>
+      <p>Tell us about you. We'll align the 24-week Golden Eagle curriculum to your goal and current expertise.</p>
+    </div>
+
+    <div class="card">
+      <h2><span class="step">1</span> Who are you?</h2>
+      <div class="row two">
+        <div>
+          <label>Full name</label>
+          <input type="text" id="eg-name" placeholder="e.g., Maria Rodriguez" />
+        </div>
+        <div>
+          <label>Current role</label>
+          <input type="text" id="eg-role" placeholder="e.g., Senior Program Manager" />
+        </div>
+      </div>
+      <div class="row two" style="margin-top: 14px;">
+        <div>
+          <label>Years of IT experience</label>
+          <select id="eg-experience">
+            <option value="0-3">0–3 years (Early career)</option>
+            <option value="4-7">4–7 years (Mid-level)</option>
+            <option value="8-15" selected>8–15 years (Senior)</option>
+            <option value="15+">15+ years (Leader / Executive)</option>
+          </select>
+        </div>
+        <div>
+          <label>Hours per week you can commit</label>
+          <select id="eg-hours">
+            <option value="3">3 hrs/week (Light)</option>
+            <option value="6" selected>6 hrs/week (Standard)</option>
+            <option value="10">10 hrs/week (Intensive)</option>
+            <option value="15">15+ hrs/week (Immersive)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="step">2</span> What's your AI goal?</h2>
+      <label>Pick a preset (or write your own below)</label>
+      <div class="phase-grid" id="goal-presets"></div>
+      <div style="margin-top: 14px;">
+        <label>Your AI ambition (1–2 sentences)</label>
+        <textarea id="eg-goal" placeholder="e.g., I want to lead our enterprise AI adoption, ship one production RAG system, and become known as the AI champion in my org by year-end."></textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="step">3</span> Which curriculum phases matter most?</h2>
+      <p class="note">Pick the phases aligned to your goal. We'll weight your plan around these. (You can pick all 6.)</p>
+      <div class="phase-grid" id="phase-picker"></div>
+    </div>
+
+    <div class="card">
+      <h2><span class="step">4</span> Generate your plan</h2>
+      <div class="actions-row">
+        <button class="btn" id="gen-plan-btn">⚡ Generate My Plan</button>
+        <button class="btn secondary" id="enhance-plan-btn" disabled>✨ Enhance with Claude</button>
+        <button class="btn ghost" id="copy-plan-btn" disabled>📋 Copy plan</button>
+        <button class="btn ghost" id="download-plan-btn" disabled>⬇ Download as text</button>
+      </div>
+      <p class="note">"Enhance with Claude" calls the Anthropic API directly from your browser. Add your API key in Settings below to enable it.</p>
+
+      <details style="margin-top: 14px;">
+        <summary>⚙ AI Settings (optional)</summary>
+        <div style="margin-top: 10px;">
+          <label>Anthropic API key (stored locally in your browser only)</label>
+          <input type="password" id="api-key" placeholder="sk-ant-..." />
+        </div>
+      </details>
+
+      <div id="plan-output" class="plan-output hidden"></div>
+    </div>
+  </section>
+
+  <!-- LINKEDIN POST -->
+  <section id="view-post" class="view">
+    <div class="hero">
+      <h1>LinkedIn Post Generator</h1>
+      <p>Document your Golden Eagle journey publicly. Upload a photo, pick a milestone, choose a cadence — we render a branded post image and write your ad copy.</p>
+    </div>
+
+    <div class="card">
+      <h2><span class="step">1</span> Your photo</h2>
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" id="photo-input" accept="image/*" class="hidden" />
+        <div id="upload-placeholder">
+          <div style="font-size: 36px;">📸</div>
+          <div style="margin-top: 6px; font-weight: 600; color: var(--text-bright);">Click to upload a photo</div>
+          <div class="note">JPG / PNG — your face works best</div>
+        </div>
+        <img id="photo-preview" class="hidden" />
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="step">2</span> What did you learn?</h2>
+      <div class="row two">
+        <div>
+          <label>Your name</label>
+          <input type="text" id="post-name" placeholder="e.g., Maria Rodriguez" />
+        </div>
+        <div>
+          <label>Headline (subtitle)</label>
+          <input type="text" id="post-headline" placeholder="e.g., Program Manager · Golden Eagle Cohort 2026" />
+        </div>
+      </div>
+      <div class="row two" style="margin-top: 14px;">
+        <div>
+          <label>Milestone — which week did you finish?</label>
+          <select id="post-week"></select>
+        </div>
+        <div>
+          <label>Tone</label>
+          <select id="post-tone">
+            <option value="reflective">Reflective &amp; Personal</option>
+            <option value="bold">Bold &amp; Confident</option>
+            <option value="curious">Curious &amp; Inquisitive</option>
+            <option value="celebratory">Celebratory</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top: 14px;">
+        <label>Your reflection / key takeaway (1–3 sentences)</label>
+        <textarea id="post-reflection" placeholder="e.g., This week I finally understood why RAG beats fine-tuning for our use case — the cost math alone is a wake-up call."></textarea>
+      </div>
+      <div style="margin-top: 14px;">
+        <label>Custom image prompt (optional — describes the background scene)</label>
+        <input type="text" id="post-prompt" placeholder="e.g., abstract gold and navy gradient with AI neural network lines" />
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="step">3</span> Posting cadence</h2>
+      <div class="frequency-grid" id="frequency-picker">
+        <div class="freq-tile selected" data-freq="daily">
+          <div class="f-label">Daily</div>
+          <div class="f-sub">5 posts/week</div>
+        </div>
+        <div class="freq-tile" data-freq="3x">
+          <div class="f-label">3× / week</div>
+          <div class="f-sub">M / W / F</div>
+        </div>
+        <div class="freq-tile" data-freq="weekly">
+          <div class="f-label">Weekly</div>
+          <div class="f-sub">Every Friday</div>
+        </div>
+        <div class="freq-tile" data-freq="milestone">
+          <div class="f-label">Per Milestone</div>
+          <div class="f-sub">End of each phase</div>
+        </div>
+      </div>
+      <p class="note" id="freq-summary">→ <strong>Daily</strong>: We'll prep 5 post drafts per week — one per learning sprint.</p>
+    </div>
+
+    <div class="card">
+      <h2><span class="step">4</span> Generate &amp; preview</h2>
+      <div class="actions-row">
+        <button class="btn" id="gen-post-btn">⚡ Generate Post</button>
+        <button class="btn ghost" id="copy-post-btn" disabled>📋 Copy ad copy</button>
+        <button class="btn ghost" id="download-image-btn" disabled>⬇ Download image</button>
+        <button class="btn secondary" id="open-linkedin-btn" disabled>🔗 Open LinkedIn to share</button>
+      </div>
+
+      <div id="post-output" class="hidden" style="margin-top: 18px;">
+        <h3 style="color: var(--gold-bright); font-size: 15px; margin: 14px 0 8px;">LinkedIn Preview</h3>
+        <div class="linkedin-preview">
+          <div class="li-header">
+            <div class="li-avatar"><img id="preview-avatar" /></div>
+            <div>
+              <div class="li-name" id="preview-name"></div>
+              <div class="li-headline" id="preview-headline"></div>
+              <div class="li-time">Now · 🌐</div>
+            </div>
+          </div>
+          <div class="li-body" id="preview-body"></div>
+          <canvas id="post-canvas" class="li-image" width="1200" height="675"></canvas>
+          <div class="li-footer">
+            <span>👍 Like</span>
+            <span>💬 Comment</span>
+            <span>🔁 Repost</span>
+            <span>📤 Send</span>
+          </div>
+        </div>
+
+        <h3 style="color: var(--gold-bright); font-size: 15px; margin: 24px 0 8px;">Posting schedule (next 4 weeks)</h3>
+        <div id="schedule-output" class="plan-output"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="curriculum.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "name": "Golden Eagle Programme",
+  "short_name": "Golden Eagle",
+  "description": "Hyper-personalised AI Leadership learning companion & LinkedIn post generator",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080604",
+  "theme_color": "#080604",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "eagle-banner.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "productivity"]
+}
