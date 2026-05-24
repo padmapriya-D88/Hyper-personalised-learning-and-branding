@@ -252,8 +252,32 @@
       renderStats(_allStudents);
       renderTable(_allStudents);
     } catch (e) {
-      document.getElementById("student-tbody").innerHTML =
-        `<tr><td colspan="9" class="empty-row">Error loading data: ${e.message}</td></tr>`;
+      const isPermission = e.code === "permission-denied" || e.message.includes("permissions");
+      document.getElementById("student-tbody").innerHTML = isPermission
+        ? `<tr><td colspan="9" class="empty-row" style="text-align:left; padding:28px 32px;">
+            <div style="color:var(--gold-bright); font-size:14px; font-weight:700; margin-bottom:10px;">⚠️ Firestore rules not set up yet</div>
+            <div style="color:var(--text-muted); font-size:13px; line-height:1.8;">
+              Go to <strong style="color:var(--text-bright);">Firebase Console → Firestore → Rules</strong> and paste these rules, then click <strong style="color:var(--text-bright);">Publish</strong>:<br/><br/>
+              <code style="display:block; background:#0a0704; border:1px solid var(--border-gold); border-radius:8px; padding:14px; font-size:12px; white-space:pre-wrap; color:var(--gold-bright);">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null &&
+             request.auth.token.email in ['agilebodhipvt@gmail.com'];
+    }
+    match /students/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read: if isAdmin();
+    }
+    match /students/{document=**} {
+      allow list: if isAdmin();
+    }
+  }
+}</code>
+            </div>
+            <button class="btn secondary" style="margin-top:16px;" onclick="loadStudents()">🔄 Retry after publishing rules</button>
+          </td></tr>`
+        : `<tr><td colspan="9" class="empty-row">Error loading data: ${e.message}</td></tr>`;
     }
   }
 

@@ -1,4 +1,4 @@
-const CACHE = 'golden-eagle-v3';
+const CACHE = 'golden-eagle-v4';
 const ASSETS = ['/', '/index.html', '/login.html', '/admin.html', '/styles.css', '/app.js', '/auth.js', '/firebase-config.js', '/curriculum.js', '/eagle-banner.png', '/manifest.json'];
 
 self.addEventListener('install', e => {

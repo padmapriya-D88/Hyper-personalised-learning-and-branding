@@ -29,7 +29,9 @@ const ADMIN_EMAILS = [
   "agilebodhipvt@gmail.com",
 ];
 
-// ── Firestore Security Rules (paste into Firebase Console → Firestore → Rules)
+// ── Firestore Security Rules ─────────────────────────────────────────
+// Go to: Firebase Console → Firestore Database → Rules tab
+// Paste the block below and click "Publish"
 /*
 rules_version = '2';
 service cloud.firestore {
@@ -40,16 +42,17 @@ service cloud.firestore {
              request.auth.token.email in ['agilebodhipvt@gmail.com'];
     }
 
-    // Each student can read/write only their own document
+    // Each student can read/write their own document
     match /students/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
-      allow read:        if isAdmin();
+      allow read: if isAdmin();
     }
 
-    // Admin can list all students
-    match /students/{uid} {
+    // Admin can query (list) all student documents
+    match /students/{document=**} {
       allow list: if isAdmin();
     }
+
   }
 }
 */
