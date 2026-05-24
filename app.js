@@ -51,8 +51,11 @@ function initAuth() {
 
     if (_studentProfile && _studentProfile.goalLocked) {
       applyLockedState(_studentProfile);
+    } else if (_studentProfile) {
+      // Restore saved draft — form stays editable
+      restoreProfileDraft(_studentProfile);
     } else {
-      // Pre-fill name from auth
+      // Brand-new user — pre-fill name from auth only
       const nameInp = document.getElementById("eg-name");
       if (nameInp && !nameInp.value) {
         nameInp.value = user.displayName || "";
@@ -111,11 +114,74 @@ function applyLockedState(profile) {
     switchView("plan");
   }
 
-  // Hide "Generate" button, show locked note
-  const genBtn = document.getElementById("gen-plan-btn");
-  if (genBtn) {
-    genBtn.textContent  = "✓ Plan Saved";
-    genBtn.disabled = true;
+  // Hide "Generate" + "Save" buttons when goal is locked
+  const genBtn  = document.getElementById("gen-plan-btn");
+  const saveBtn = document.getElementById("save-profile-btn");
+  if (genBtn)  { genBtn.textContent = "✓ Plan Saved"; genBtn.disabled = true; }
+  if (saveBtn) { saveBtn.style.display = "none"; }
+}
+
+// ── RESTORE DRAFT (saved but not locked) ────────────────────────────
+function restoreProfileDraft(profile) {
+  // Fill form fields (still editable)
+  if (profile.name)       document.getElementById("eg-name").value       = profile.name;
+  if (profile.role)       document.getElementById("eg-role").value       = profile.role;
+  if (profile.experience) document.getElementById("eg-experience").value = profile.experience;
+  if (profile.hours)      document.getElementById("eg-hours").value      = profile.hours;
+  if (profile.goal)       document.getElementById("eg-goal").value       = profile.goal;
+
+  // Restore selected phases and update already-rendered tiles
+  if (profile.phases && profile.phases.length) {
+    State.selectedPhases = new Set(profile.phases);
+    document.querySelectorAll(".phase-tile[data-phase]").forEach(tile => {
+      const ph = parseInt(tile.dataset.phase, 10);
+      tile.classList.toggle("selected", State.selectedPhases.has(ph));
+    });
+  }
+
+  // Restore goal preset highlight
+  if (profile.goalPreset) {
+    State.selectedGoalPreset = profile.goalPreset;
+    document.querySelectorAll("[data-goal-id]").forEach(tile => {
+      tile.classList.toggle("selected", tile.dataset.goalId === profile.goalPreset);
+    });
+  }
+
+  toast("✅ Your profile has been restored.", 2500);
+}
+
+// ── SAVE PROFILE DRAFT (manual Save button) ──────────────────────────
+async function saveProfileDraft() {
+  if (!_currentUser) { toast("Please sign in first."); return; }
+
+  const btn = document.getElementById("save-profile-btn");
+  btn.disabled = true;
+  btn.textContent = "Saving…";
+
+  const profile = {
+    uid:        _currentUser.uid,
+    email:      _currentUser.email,
+    name:       document.getElementById("eg-name").value.trim(),
+    role:       document.getElementById("eg-role").value.trim(),
+    experience: document.getElementById("eg-experience").value,
+    hours:      document.getElementById("eg-hours").value,
+    goal:       document.getElementById("eg-goal").value.trim(),
+    goalPreset: State.selectedGoalPreset
+                  ? (State.selectedGoalPreset.id || State.selectedGoalPreset)
+                  : "",
+    phases:     [...State.selectedPhases],
+  };
+
+  try {
+    await saveStudentProfile(_currentUser.uid, profile);
+    _studentProfile = profile;
+    toast("💾 Profile saved! Your data is visible to the admin.");
+  } catch (err) {
+    console.error("Save failed:", err);
+    toast("❌ Save failed — check your internet connection.");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "💾 Save My Profile";
   }
 }
 
@@ -279,6 +345,7 @@ function renderPhasePicker() {
 
 // ---------- Plan generation ----------
 document.getElementById("gen-plan-btn").addEventListener("click", generatePlan);
+document.getElementById("save-profile-btn").addEventListener("click", saveProfileDraft);
 
 function generatePlan() {
   const name = document.getElementById("eg-name").value.trim() || "Golden Eagle";
