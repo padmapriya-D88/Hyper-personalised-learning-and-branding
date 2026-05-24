@@ -11,6 +11,197 @@ const State = {
   generatedPostText: null,
 };
 
+// ── FIREBASE AUTH & USER STATE ──────────────────────────────────────
+let _currentUser    = null;
+let _studentProfile = null;
+
+function initAuth() {
+  initFirebase();
+
+  getAuth().onAuthStateChanged(async user => {
+    document.getElementById("auth-loading").style.display = "none";
+
+    if (!user) {
+      window.location.href = "login.html";
+      return;
+    }
+
+    _currentUser = user;
+
+    // Show user chip
+    const chip    = document.getElementById("user-chip");
+    const avatar  = document.getElementById("user-avatar");
+    const nameEl  = document.getElementById("user-display-name");
+    const signOut = document.getElementById("sign-out-btn");
+    const adminLink = document.getElementById("admin-link");
+
+    const displayName = user.displayName || user.email.split("@")[0];
+    avatar.textContent  = displayName.charAt(0).toUpperCase();
+    nameEl.textContent  = displayName;
+    chip.style.display  = "flex";
+    signOut.style.display = "block";
+
+    // Show admin link if admin
+    if (isAdmin(user.email)) {
+      adminLink.style.display = "inline-flex";
+    }
+
+    // Load student profile
+    _studentProfile = await loadStudentProfile(user.uid);
+
+    if (_studentProfile && _studentProfile.goalLocked) {
+      applyLockedState(_studentProfile);
+    } else {
+      // Pre-fill name from auth
+      const nameInp = document.getElementById("eg-name");
+      if (nameInp && !nameInp.value) {
+        nameInp.value = user.displayName || "";
+      }
+    }
+  });
+}
+
+async function handleSignOut() {
+  await signOut();
+  window.location.href = "login.html";
+}
+
+function applyLockedState(profile) {
+  // Show locked banner
+  document.getElementById("goal-locked-banner").classList.remove("hidden");
+
+  // Disable all goal-setting inputs
+  ["eg-name","eg-role","eg-experience","eg-hours","eg-goal"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.disabled = true; el.value = profile[id.replace("eg-","")] || el.value; }
+  });
+
+  // Fill in saved values
+  document.getElementById("eg-name").value       = profile.name       || "";
+  document.getElementById("eg-role").value       = profile.role       || "";
+  document.getElementById("eg-experience").value = profile.experience || "8-15";
+  document.getElementById("eg-hours").value      = profile.hours      || "6";
+  document.getElementById("eg-goal").value       = profile.goal       || "";
+
+  // Restore selected phases from saved profile
+  if (profile.phases) {
+    State.selectedPhases = new Set(profile.phases);
+    document.querySelectorAll(".phase-tile").forEach(tile => {
+      const ph = parseInt(tile.dataset.phase);
+      tile.classList.toggle("selected", State.selectedPhases.has(ph));
+      tile.style.pointerEvents = "none";
+      tile.style.opacity = State.selectedPhases.has(ph) ? "1" : "0.45";
+    });
+  }
+
+  // Restore selected goal preset
+  if (profile.goalPreset) {
+    State.selectedGoalPreset = profile.goalPreset;
+    document.querySelectorAll("[data-preset]").forEach(t => {
+      t.classList.toggle("selected", t.dataset.preset === profile.goalPreset);
+      t.style.pointerEvents = "none";
+    });
+  }
+
+  // Generate & show the plan immediately using saved data
+  if (profile.weeklyPlan) {
+    State.generatedPlan = profile;
+    State.generatedPlan.weeks = profile.weeklyPlan;
+    renderPlan(State.generatedPlan);
+    switchView("plan");
+  }
+
+  // Hide "Generate" button, show locked note
+  const genBtn = document.getElementById("gen-plan-btn");
+  if (genBtn) {
+    genBtn.textContent  = "✓ Plan Saved";
+    genBtn.disabled = true;
+  }
+}
+
+// ── SAVE GOAL TO FIRESTORE on first plan generation ─────────────────
+async function saveGoalToFirestore(planData) {
+  if (!_currentUser) return;
+  const existing = await loadStudentProfile(_currentUser.uid);
+  if (existing && existing.goalLocked) return; // never overwrite
+
+  const profile = {
+    uid:        _currentUser.uid,
+    email:      _currentUser.email,
+    name:       planData.name,
+    role:       planData.role,
+    experience: planData.exp,
+    hours:      planData.hours,
+    goal:       planData.goal,
+    goalPreset: State.selectedGoalPreset || "",
+    phases:     [...State.selectedPhases],
+    weeklyPlan: planData.weeks,
+  };
+
+  await lockStudentGoal(_currentUser.uid, profile);
+  _studentProfile = await loadStudentProfile(_currentUser.uid);
+  toast("🔒 Your learning goal has been saved and locked.");
+}
+
+// ── TOKEN USAGE TRACKER ──────────────────────────────────────────────
+// Pricing: Claude Sonnet (claude-opus-4-7) per million tokens
+const TOKEN_PRICING = {
+  "claude-opus-4-7":         { input: 15.00, output: 75.00 },
+  "claude-sonnet-4-6":       { input: 3.00,  output: 15.00 },
+  "claude-haiku-3-5":        { input: 0.80,  output: 4.00  },
+  "default":                 { input: 3.00,  output: 15.00 },
+};
+
+const TokenTracker = {
+  _key: "ge-token-usage",
+
+  load() {
+    try { return JSON.parse(localStorage.getItem(this._key) || "[]"); }
+    catch { return []; }
+  },
+
+  save(records) {
+    localStorage.setItem(this._key, JSON.stringify(records));
+  },
+
+  record({ feature, model, inputTokens, outputTokens }) {
+    const records = this.load();
+    const pricing = TOKEN_PRICING[model] || TOKEN_PRICING["default"];
+    const inputCost  = (inputTokens  / 1_000_000) * pricing.input;
+    const outputCost = (outputTokens / 1_000_000) * pricing.output;
+    records.push({
+      id: Date.now(),
+      ts: new Date().toISOString(),
+      feature,
+      model,
+      inputTokens,
+      outputTokens,
+      totalTokens: inputTokens + outputTokens,
+      costUsd: inputCost + outputCost,
+    });
+    this.save(records);
+    renderUsageDashboard();
+  },
+
+  clear() {
+    this.save([]);
+    renderUsageDashboard();
+    toast("Token usage history cleared.");
+  },
+
+  totals() {
+    const records = this.load();
+    return records.reduce((acc, r) => {
+      acc.calls       += 1;
+      acc.inputTokens += r.inputTokens;
+      acc.outputTokens+= r.outputTokens;
+      acc.totalTokens += r.totalTokens;
+      acc.costUsd     += r.costUsd;
+      return acc;
+    }, { calls: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0, costUsd: 0 });
+  },
+};
+
 // ---------- Tab navigation ----------
 document.querySelectorAll("nav.tabs button").forEach(btn => {
   btn.addEventListener("click", () => switchView(btn.dataset.view));
@@ -128,6 +319,11 @@ function generatePlan() {
   document.getElementById("copy-plan-btn").disabled = false;
   document.getElementById("download-plan-btn").disabled = false;
 
+  // Save to Firestore & lock goal (first-time only)
+  saveGoalToFirestore(State.generatedPlan).catch(err => {
+    console.warn("Firestore save skipped (no Firebase config?):", err.message);
+  });
+
   // Also populate the LinkedIn post week picker
   populatePostWeekPicker(plan);
 
@@ -226,6 +422,17 @@ No prose outside the JSON.`;
       throw new Error(`API ${resp.status}: ${err.slice(0, 200)}`);
     }
     const data = await resp.json();
+
+    // Record token usage
+    if (data.usage) {
+      TokenTracker.record({
+        feature: "Learning Plan — Enhance with Claude",
+        model: data.model || "claude-opus-4-7",
+        inputTokens:  data.usage.input_tokens  || 0,
+        outputTokens: data.usage.output_tokens || 0,
+      });
+    }
+
     const text = data.content[0].text;
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (!jsonMatch) throw new Error("No JSON in response");
@@ -769,8 +976,195 @@ window.addEventListener('appinstalled', () => {
 const _eagleSvgImg = new Image();
 _eagleSvgImg.src = 'eagle-banner.png';
 
+// ── TOKEN USAGE DASHBOARD ────────────────────────────────────────────
+function renderUsageDashboard() {
+  const records = TokenTracker.load();
+  const totals  = TokenTracker.totals();
+
+  // ── Summary cards ──
+  document.getElementById("tu-calls").textContent        = totals.calls.toLocaleString();
+  document.getElementById("tu-input").textContent        = fmtTokens(totals.inputTokens);
+  document.getElementById("tu-output").textContent       = fmtTokens(totals.outputTokens);
+  document.getElementById("tu-cost").textContent         = "$" + totals.costUsd.toFixed(4);
+  document.getElementById("tu-total-tok").textContent    = fmtTokens(totals.totalTokens);
+
+  // ── Bar chart ──
+  drawUsageChart(records);
+
+  // ── History table ──
+  const tbody = document.getElementById("tu-history");
+  if (records.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">
+      No API calls yet — use "Enhance with Claude" on the Learning Plan page to see usage here.
+    </td></tr>`;
+  } else {
+    tbody.innerHTML = [...records].reverse().map(r => `
+      <tr>
+        <td>${fmtDate(r.ts)}</td>
+        <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${r.feature}</td>
+        <td style="font-size:11px; color:var(--text-muted);">${r.model.replace("claude-","").replace("-2","")}</td>
+        <td class="num">${r.inputTokens.toLocaleString()}</td>
+        <td class="num">${r.outputTokens.toLocaleString()}</td>
+        <td class="num cost">$${r.costUsd.toFixed(4)}</td>
+      </tr>`).join("");
+  }
+}
+
+function fmtTokens(n) {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M";
+  if (n >= 1_000)     return (n / 1_000).toFixed(1) + "K";
+  return n.toString();
+}
+
+function fmtDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-GB", { day:"numeric", month:"short" }) + " " +
+         d.toLocaleTimeString("en-GB", { hour:"2-digit", minute:"2-digit" });
+}
+
+function drawUsageChart(records) {
+  const canvas = document.getElementById("tu-chart");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+
+  ctx.clearRect(0, 0, W, H);
+
+  if (records.length === 0) {
+    ctx.fillStyle = "rgba(212,148,30,0.15)";
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "rgba(212,148,30,0.4)";
+    ctx.font = "13px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("No usage data yet", W / 2, H / 2);
+    return;
+  }
+
+  // Group by date (last 14 days)
+  const buckets = {};
+  const now = Date.now();
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(now - i * 86400000);
+    buckets[d.toISOString().slice(0, 10)] = { input: 0, output: 0 };
+  }
+  records.forEach(r => {
+    const day = r.ts.slice(0, 10);
+    if (buckets[day]) {
+      buckets[day].input  += r.inputTokens;
+      buckets[day].output += r.outputTokens;
+    }
+  });
+
+  const days  = Object.keys(buckets);
+  const vals  = Object.values(buckets);
+  const maxTok = Math.max(...vals.map(v => v.input + v.output), 1);
+
+  const pad = { top: 16, right: 16, bottom: 32, left: 52 };
+  const cW = W - pad.left - pad.right;
+  const cH = H - pad.top  - pad.bottom;
+  const barW = (cW / days.length) * 0.6;
+  const gap  = cW / days.length;
+
+  // Y-axis gridlines
+  ctx.strokeStyle = "rgba(212,148,30,0.10)";
+  ctx.lineWidth = 1;
+  [0, 0.25, 0.5, 0.75, 1].forEach(frac => {
+    const y = pad.top + cH * (1 - frac);
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(W - pad.right, y);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(212,148,30,0.5)";
+    ctx.font = "10px Inter,sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(fmtTokens(Math.round(maxTok * frac)), pad.left - 4, y + 3);
+  });
+
+  // Bars
+  days.forEach((day, i) => {
+    const x = pad.left + i * gap + (gap - barW) / 2;
+    const tot = vals[i].input + vals[i].output;
+    const totalH = (tot / maxTok) * cH;
+    const inH    = (vals[i].input / maxTok) * cH;
+    const outH   = (vals[i].output / maxTok) * cH;
+
+    if (totalH > 0) {
+      // Input bar (bottom)
+      const gIn = ctx.createLinearGradient(0, pad.top + cH - inH, 0, pad.top + cH);
+      gIn.addColorStop(0, "rgba(212,148,30,0.85)");
+      gIn.addColorStop(1, "rgba(160,104,16,0.85)");
+      ctx.fillStyle = gIn;
+      ctx.beginPath();
+      ctx.roundRect(x, pad.top + cH - inH, barW, inH, [3, 3, 0, 0]);
+      ctx.fill();
+
+      // Output bar (on top)
+      if (outH > 0) {
+        const gOut = ctx.createLinearGradient(0, pad.top + cH - totalH, 0, pad.top + cH - inH);
+        gOut.addColorStop(0, "rgba(240,192,64,0.90)");
+        gOut.addColorStop(1, "rgba(200,148,32,0.90)");
+        ctx.fillStyle = gOut;
+        ctx.beginPath();
+        ctx.roundRect(x, pad.top + cH - totalH, barW, outH, [3, 3, 0, 0]);
+        ctx.fill();
+      }
+    }
+
+    // X-axis label (show every other)
+    if (i % 2 === 0 || days.length <= 7) {
+      ctx.fillStyle = "rgba(212,148,30,0.55)";
+      ctx.font = "9px Inter,sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(day.slice(5), x + barW / 2, H - 6);
+    }
+  });
+
+  // Legend
+  ctx.fillStyle = "rgba(212,148,30,0.85)";
+  ctx.fillRect(pad.left, 4, 10, 8);
+  ctx.fillStyle = "rgba(240,192,64,0.90)";
+  ctx.fillRect(pad.left + 65, 4, 10, 8);
+  ctx.fillStyle = "rgba(212,148,30,0.65)";
+  ctx.font = "10px Inter,sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("Input tokens", pad.left + 13, 12);
+  ctx.fillText("Output tokens", pad.left + 78, 12);
+}
+
+// ── Seed a demo record if storage is empty (so dashboard isn't blank) ──
+function seedDemoIfEmpty() {
+  if (TokenTracker.load().length === 0) {
+    const now = new Date();
+    [
+      { daysAgo: 6, feature: "Learning Plan — Enhance with Claude",   inp: 1240, out: 620  },
+      { daysAgo: 4, feature: "LinkedIn Post — Ad Copy Generator",     inp: 890,  out: 450  },
+      { daysAgo: 3, feature: "Learning Plan — Enhance with Claude",   inp: 1380, out: 710  },
+      { daysAgo: 1, feature: "LinkedIn Post — Ad Copy Generator",     inp: 760,  out: 380  },
+      { daysAgo: 0, feature: "Learning Plan — Enhance with Claude",   inp: 1510, out: 820  },
+    ].forEach(({ daysAgo, feature, inp, out }) => {
+      const d = new Date(now - daysAgo * 86400000);
+      const records = TokenTracker.load();
+      const pricing = TOKEN_PRICING["default"];
+      records.push({
+        id: d.getTime(),
+        ts: d.toISOString(),
+        feature,
+        model: "claude-opus-4-7",
+        inputTokens:  inp,
+        outputTokens: out,
+        totalTokens:  inp + out,
+        costUsd: ((inp / 1_000_000) * pricing.input) + ((out / 1_000_000) * pricing.output),
+      });
+      TokenTracker.save(records);
+    });
+  }
+}
+
 // ---------- init ----------
+initAuth();          // Firebase auth guard — redirects to login.html if not signed in
 renderCurriculumOverview();
 renderGoalPresets();
 renderPhasePicker();
 updateFreqSummary();
+seedDemoIfEmpty();
+renderUsageDashboard();

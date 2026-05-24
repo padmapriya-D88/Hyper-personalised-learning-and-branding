@@ -1,5 +1,5 @@
-const CACHE = 'golden-eagle-v2';
-const ASSETS = ['/', '/index.html', '/styles.css', '/app.js', '/curriculum.js', '/eagle-banner.png', '/manifest.json'];
+const CACHE = 'golden-eagle-v3';
+const ASSETS = ['/', '/index.html', '/login.html', '/admin.html', '/styles.css', '/app.js', '/auth.js', '/firebase-config.js', '/curriculum.js', '/eagle-banner.png', '/manifest.json'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));

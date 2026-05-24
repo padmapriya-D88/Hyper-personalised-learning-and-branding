@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Golden Eagle Programme — Sign In</title>
+<link rel="manifest" href="manifest.json"/>
+<meta name="theme-color" content="#080604"/>
+<link rel="stylesheet" href="styles.css"/>
+<style>
+  body { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; }
+
+  .login-wrap {
+    width: 100%;
+    max-width: 440px;
+  }
+
+  .login-banner {
+    width: 100%;
+    border-radius: 14px 14px 0 0;
+    display: block;
+    object-fit: cover;
+    height: 160px;
+    object-position: center 30%;
+  }
+
+  .login-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border-gold);
+    border-top: none;
+    border-radius: 0 0 14px 14px;
+    padding: 28px 28px 24px;
+    box-shadow: var(--shadow-gold);
+  }
+
+  .login-title {
+    font-family: 'Cinzel', serif;
+    font-size: 20px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #f0c040 0%, #d4941e 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-align: center;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+
+  .login-sub {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 22px;
+  }
+
+  .login-field { margin-bottom: 14px; }
+  .login-field label { font-size: 12px; }
+
+  .google-btn {
+    width: 100%;
+    background: white;
+    color: #1a1a1a;
+    border: 1px solid #d0d0d0;
+    border-radius: 8px;
+    padding: 11px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: background 0.15s;
+    font-family: 'Inter', sans-serif;
+  }
+  .google-btn:hover { background: #f5f5f5; }
+  .google-btn svg { flex-shrink:0; }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 16px 0;
+    color: var(--text-muted);
+    font-size: 12px;
+  }
+  .divider::before, .divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-gold);
+  }
+
+  .btn-full { width: 100%; text-align: center; margin-top: 4px; padding: 12px; font-size: 14px; }
+
+  .login-toggle {
+    text-align: center;
+    margin-top: 16px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .login-toggle a {
+    color: var(--gold-main);
+    cursor: pointer;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .login-toggle a:hover { color: var(--gold-bright); }
+
+  .login-error {
+    background: rgba(200,50,30,0.15);
+    border: 1px solid rgba(200,50,30,0.4);
+    color: #ff8070;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 13px;
+    margin-bottom: 12px;
+    display: none;
+  }
+  .login-error.show { display: block; }
+
+  .loading-overlay {
+    position: fixed; inset: 0;
+    background: rgba(8,6,4,0.85);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .loading-overlay.show { display: flex; }
+  .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid rgba(212,148,30,0.2);
+    border-top-color: var(--gold-main);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-overlay p { color: var(--gold-bright); font-size: 14px; }
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loading">
+  <div class="spinner"></div>
+  <p id="loading-msg">Signing you in…</p>
+</div>
+
+<div class="login-wrap">
+  <img src="eagle-banner.png" alt="Golden Eagle Programme" class="login-banner"/>
+
+  <div class="login-box">
+    <div class="login-title">Golden Eagle Programme</div>
+    <div class="login-sub" id="login-sub">Sign in to your learning journey</div>
+
+    <div class="login-error" id="login-error"></div>
+
+    <!-- Name field (signup only) -->
+    <div class="login-field hidden" id="name-field">
+      <label>Full name</label>
+      <input type="text" id="inp-name" placeholder="e.g., Maria Rodriguez"/>
+    </div>
+
+    <div class="login-field">
+      <label>Email address</label>
+      <input type="email" id="inp-email" placeholder="you@company.com"/>
+    </div>
+
+    <div class="login-field">
+      <label>Password</label>
+      <input type="password" id="inp-password" placeholder="Min. 6 characters"/>
+    </div>
+
+    <button class="btn btn-full" id="email-btn">Sign In</button>
+
+    <div class="divider">or</div>
+
+    <button class="google-btn" id="google-btn">
+      <svg width="18" height="18" viewBox="0 0 18 18">
+        <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
+        <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z"/>
+        <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
+        <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/>
+      </svg>
+      Continue with Google
+    </button>
+
+    <div class="login-toggle">
+      <span id="toggle-text">Don't have an account?</span>
+      <a id="toggle-link"> Sign up</a>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="auth.js"></script>
+<script>
+  initFirebase();
+
+  // If already signed in → go to app
+  getAuth().onAuthStateChanged(user => {
+    if (user) window.location.href = "index.html";
+  });
+
+  let isSignup = false;
+  const emailBtn    = document.getElementById("email-btn");
+  const googleBtn   = document.getElementById("google-btn");
+  const toggleLink  = document.getElementById("toggle-link");
+  const toggleText  = document.getElementById("toggle-text");
+  const nameField   = document.getElementById("name-field");
+  const loginSub    = document.getElementById("login-sub");
+  const errEl       = document.getElementById("login-error");
+  const loading     = document.getElementById("loading");
+  const loadingMsg  = document.getElementById("loading-msg");
+
+  function showError(msg) {
+    errEl.textContent = msg;
+    errEl.classList.add("show");
+  }
+  function clearError() { errEl.classList.remove("show"); }
+  function showLoading(msg) { loadingMsg.textContent = msg; loading.classList.add("show"); }
+  function hideLoading()    { loading.classList.remove("show"); }
+
+  toggleLink.addEventListener("click", () => {
+    isSignup = !isSignup;
+    nameField.classList.toggle("hidden", !isSignup);
+    emailBtn.textContent   = isSignup ? "Create Account" : "Sign In";
+    toggleLink.textContent = isSignup ? " Sign in" : " Sign up";
+    toggleText.textContent = isSignup ? "Already have an account?" : "Don't have an account?";
+    loginSub.textContent   = isSignup ? "Create your Golden Eagle account" : "Sign in to your learning journey";
+    clearError();
+  });
+
+  emailBtn.addEventListener("click", async () => {
+    clearError();
+    const email    = document.getElementById("inp-email").value.trim();
+    const password = document.getElementById("inp-password").value;
+    const name     = document.getElementById("inp-name").value.trim();
+
+    if (!email || !password) return showError("Please enter your email and password.");
+    if (isSignup && !name)   return showError("Please enter your full name.");
+
+    showLoading(isSignup ? "Creating your account…" : "Signing you in…");
+    try {
+      if (isSignup) {
+        await signUpEmail(email, password, name);
+      } else {
+        await signInEmail(email, password);
+      }
+      window.location.href = "index.html";
+    } catch (e) {
+      hideLoading();
+      const msgs = {
+        "auth/user-not-found":       "No account found with this email. Try signing up.",
+        "auth/wrong-password":       "Incorrect password. Please try again.",
+        "auth/email-already-in-use": "Email already registered. Please sign in.",
+        "auth/weak-password":        "Password must be at least 6 characters.",
+        "auth/invalid-email":        "Please enter a valid email address.",
+        "auth/too-many-requests":    "Too many attempts. Please try again in a few minutes.",
+      };
+      showError(msgs[e.code] || e.message);
+    }
+  });
+
+  googleBtn.addEventListener("click", async () => {
+    clearError();
+    showLoading("Connecting with Google…");
+    try {
+      await signInWithGoogle();
+      window.location.href = "index.html";
+    } catch (e) {
+      hideLoading();
+      if (e.code !== "auth/popup-closed-by-user") showError(e.message);
+    }
+  });
+
+  // Allow Enter key to submit
+  ["inp-email","inp-password","inp-name"].forEach(id => {
+    document.getElementById(id)?.addEventListener("keydown", e => {
+      if (e.key === "Enter") emailBtn.click();
+    });
+  });
+</script>
+</body>
+</html>

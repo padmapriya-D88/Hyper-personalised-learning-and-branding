@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Admin Dashboard — Golden Eagle Programme</title>
+<link rel="stylesheet" href="styles.css"/>
+<style>
+  .admin-header {
+    background: linear-gradient(135deg, #060402 0%, #1c1006 100%);
+    border-bottom: 1px solid var(--border-gold);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .admin-brand {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .admin-brand img { height: 42px; border-radius: 6px; }
+  .admin-brand-text { font-family:'Cinzel',serif; font-size:15px; font-weight:700;
+    background:linear-gradient(135deg,#f0c040,#d4941e);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+  .admin-badge { background:var(--gold-main); color:#080604; font-size:11px;
+    font-weight:800; padding:3px 10px; border-radius:4px; letter-spacing:1px; }
+
+  .admin-actions { display:flex; gap:10px; align-items:center; }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  @media(max-width:700px){ .stats-row { grid-template-columns:1fr 1fr; } }
+
+  .stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-gold);
+    border-radius: 12px;
+    padding: 18px 16px;
+    box-shadow: var(--shadow-gold);
+  }
+  .stat-card .s-label { font-size:11px; font-weight:700; color:var(--text-muted);
+    text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; }
+  .stat-card .s-val   { font-size:30px; font-weight:800; color:var(--gold-bright); }
+  .stat-card .s-sub   { font-size:11px; color:var(--text-muted); margin-top:4px; }
+
+  .filter-bar {
+    display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; align-items: center;
+  }
+  .filter-bar input[type=text] { max-width:260px; }
+  .filter-bar select { width: auto; }
+
+  .admin-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .admin-table th {
+    padding:10px 12px; text-align:left; font-size:11px; font-weight:700;
+    color:var(--text-muted); text-transform:uppercase; letter-spacing:0.8px;
+    border-bottom:1px solid var(--border-gold); cursor:pointer; user-select:none;
+    white-space:nowrap;
+  }
+  .admin-table th:hover { color:var(--gold-bright); }
+  .admin-table th .sort-icon { opacity:0.4; margin-left:4px; }
+  .admin-table th.sorted { color:var(--gold-bright); }
+  .admin-table th.sorted .sort-icon { opacity:1; }
+
+  .admin-table td {
+    padding:11px 12px; border-bottom:1px solid rgba(212,148,30,0.08);
+    color:var(--text-bright); vertical-align:top; max-width:200px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .admin-table td.goal-cell { max-width:260px; white-space:normal; line-height:1.4; }
+  .admin-table tr:hover td { background:rgba(212,148,30,0.04); }
+  .admin-table tr:last-child td { border-bottom:none; }
+  .admin-table .chip {
+    display:inline-block; background:rgba(212,148,30,0.15); color:var(--gold-main);
+    font-size:10px; font-weight:700; padding:2px 7px; border-radius:4px;
+    margin:1px; white-space:nowrap;
+  }
+  .admin-table .locked-icon { color:var(--gold-main); font-size:12px; }
+
+  .empty-row td { text-align:center; color:var(--text-muted); padding:32px; }
+
+  .goal-expand-btn {
+    background:none; border:none; color:var(--gold-main); cursor:pointer;
+    font-size:11px; padding:0; text-decoration:underline;
+  }
+
+  /* Modal for full goal text */
+  .goal-modal-bg {
+    position:fixed; inset:0; background:rgba(0,0,0,0.75);
+    display:none; align-items:center; justify-content:center; z-index:999; padding:20px;
+  }
+  .goal-modal-bg.show { display:flex; }
+  .goal-modal {
+    background:var(--bg-card2); border:1px solid var(--border-gold2);
+    border-radius:14px; padding:28px; max-width:520px; width:100%;
+    box-shadow:0 8px 48px rgba(0,0,0,0.6);
+  }
+  .goal-modal h3 { font-family:'Cinzel',serif; color:var(--gold-bright);
+    margin:0 0 6px; font-size:16px; }
+  .goal-modal .gm-name { color:var(--text-muted); font-size:13px; margin-bottom:14px; }
+  .goal-modal .gm-body { color:var(--text-bright); line-height:1.6; font-size:14px; }
+  .goal-modal .gm-close { margin-top:18px; }
+
+  .loading-spinner {
+    text-align:center; padding:48px; color:var(--text-muted);
+    font-size:14px; display:flex; flex-direction:column; align-items:center; gap:12px;
+  }
+  .spinner {
+    width:36px; height:36px; border:3px solid rgba(212,148,30,0.2);
+    border-top-color:var(--gold-main); border-radius:50%;
+    animation:spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header class="admin-header">
+  <div class="admin-brand">
+    <img src="eagle-banner.png" alt="Golden Eagle"/>
+    <div>
+      <div class="admin-brand-text">Golden Eagle Programme</div>
+      <div style="font-size:11px; color:var(--text-muted); letter-spacing:1px; margin-top:2px;">ADMIN DASHBOARD</div>
+    </div>
+  </div>
+  <div class="admin-actions">
+    <span class="admin-badge">ADMIN</span>
+    <span id="admin-email" style="font-size:12px; color:var(--text-muted);"></span>
+    <button class="btn secondary" onclick="exportExcel()">📥 Export Excel</button>
+    <button class="btn ghost" onclick="doSignOut()">Sign out</button>
+  </div>
+</header>
+
+<main style="max-width:1400px; margin:0 auto; padding:24px;">
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="s-label">Total Students</div>
+      <div class="s-val" id="stat-total">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="s-label">Goals Locked</div>
+      <div class="s-val" id="stat-locked">—</div>
+      <div class="s-sub">Completed onboarding</div>
+    </div>
+    <div class="stat-card">
+      <div class="s-label">Joined This Week</div>
+      <div class="s-val" id="stat-week">—</div>
+    </div>
+    <div class="stat-card" style="border-color:var(--border-gold2);">
+      <div class="s-label">Most Popular Goal</div>
+      <div class="s-val" id="stat-goal" style="font-size:16px; line-height:1.3; margin-top:4px;">—</div>
+    </div>
+  </div>
+
+  <!-- Filters + Export -->
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+      <h2 style="margin:0;">Student Directory</h2>
+      <button class="btn" onclick="exportExcel()" style="padding:8px 16px;">📥 Download Excel</button>
+    </div>
+
+    <div class="filter-bar">
+      <input type="text" id="filter-search" placeholder="🔍  Search name, email or goal…" style="flex:1; min-width:200px;"/>
+      <select id="filter-phase">
+        <option value="">All phases</option>
+        <option value="1">Phase 1 — AI Strategy</option>
+        <option value="2">Phase 2 — Productivity</option>
+        <option value="3">Phase 3 — Vibe Coding</option>
+        <option value="4">Phase 4 — Agile AI</option>
+        <option value="5">Phase 5 — Architecture</option>
+        <option value="6">Phase 6 — Build & Launch</option>
+      </select>
+      <select id="filter-locked">
+        <option value="">All students</option>
+        <option value="locked">Goal locked ✓</option>
+        <option value="pending">Goal pending</option>
+      </select>
+    </div>
+
+    <div style="overflow-x:auto;">
+      <table class="admin-table" id="student-table">
+        <thead>
+          <tr>
+            <th data-col="name">Name <span class="sort-icon">↕</span></th>
+            <th data-col="email">Email <span class="sort-icon">↕</span></th>
+            <th data-col="role">Role <span class="sort-icon">↕</span></th>
+            <th data-col="experience">Experience <span class="sort-icon">↕</span></th>
+            <th data-col="goalPreset">Goal Preset <span class="sort-icon">↕</span></th>
+            <th data-col="goal" class="goal-cell">AI Ambition</th>
+            <th data-col="phases">Phases Selected</th>
+            <th data-col="goalLocked">Status <span class="sort-icon">↕</span></th>
+            <th data-col="createdAt">Enrolled <span class="sort-icon">↕</span></th>
+          </tr>
+        </thead>
+        <tbody id="student-tbody">
+          <tr><td colspan="9" class="empty-row">
+            <div class="loading-spinner"><div class="spinner"></div>Loading students…</div>
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:12px; font-size:12px; color:var(--text-muted);" id="row-count"></div>
+  </div>
+</main>
+
+<!-- Goal modal -->
+<div class="goal-modal-bg" id="goal-modal-bg" onclick="closeGoalModal(event)">
+  <div class="goal-modal">
+    <h3 id="gm-title">Learning Goal</h3>
+    <div class="gm-name" id="gm-name"></div>
+    <div class="gm-body" id="gm-body"></div>
+    <button class="btn ghost gm-close" onclick="closeGoalModal()">Close</button>
+  </div>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<!-- SheetJS for Excel export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="firebase-config.js"></script>
+<script src="auth.js"></script>
+<script>
+  initFirebase();
+
+  let _allStudents = [];
+  let _sortCol = "createdAt";
+  let _sortAsc = false;
+
+  // Auth guard
+  getAuth().onAuthStateChanged(async user => {
+    if (!user) { window.location.href = "login.html"; return; }
+    if (!isAdmin(user.email)) {
+      alert("Access denied. Admin only.");
+      window.location.href = "index.html";
+      return;
+    }
+    document.getElementById("admin-email").textContent = user.email;
+    await loadStudents();
+  });
+
+  async function loadStudents() {
+    try {
+      _allStudents = await loadAllStudents();
+      renderStats(_allStudents);
+      renderTable(_allStudents);
+    } catch (e) {
+      document.getElementById("student-tbody").innerHTML =
+        `<tr><td colspan="9" class="empty-row">Error loading data: ${e.message}</td></tr>`;
+    }
+  }
+
+  function renderStats(students) {
+    const locked    = students.filter(s => s.goalLocked).length;
+    const weekAgo   = Date.now() - 7 * 86400000;
+    const thisWeek  = students.filter(s => {
+      const ts = s.createdAt?.toDate?.()?.getTime() || 0;
+      return ts > weekAgo;
+    }).length;
+
+    // Most common goal preset
+    const presetCount = {};
+    students.forEach(s => {
+      if (s.goalPreset) presetCount[s.goalPreset] = (presetCount[s.goalPreset] || 0) + 1;
+    });
+    const topPreset = Object.entries(presetCount).sort((a,b) => b[1]-a[1])[0];
+
+    document.getElementById("stat-total").textContent  = students.length;
+    document.getElementById("stat-locked").textContent = locked;
+    document.getElementById("stat-week").textContent   = thisWeek;
+    document.getElementById("stat-goal").textContent   = topPreset
+      ? topPreset[0].replace(/-/g," ").replace(/\b\w/g, c => c.toUpperCase())
+      : "—";
+  }
+
+  function getFiltered() {
+    const search = document.getElementById("filter-search").value.toLowerCase();
+    const phase  = document.getElementById("filter-phase").value;
+    const locked = document.getElementById("filter-locked").value;
+
+    return _allStudents.filter(s => {
+      if (search && !JSON.stringify([s.name,s.email,s.goal]).toLowerCase().includes(search)) return false;
+      if (phase  && !(s.phases || []).map(String).includes(phase)) return false;
+      if (locked === "locked" && !s.goalLocked) return false;
+      if (locked === "pending" && s.goalLocked) return false;
+      return true;
+    }).sort((a, b) => {
+      let av = a[_sortCol], bv = b[_sortCol];
+      if (av?.toDate) av = av.toDate().getTime();
+      if (bv?.toDate) bv = bv.toDate().getTime();
+      if (av == null) av = "";
+      if (bv == null) bv = "";
+      return _sortAsc ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1);
+    });
+  }
+
+  function renderTable(students) {
+    const filtered = getFiltered();
+    document.getElementById("row-count").textContent =
+      `Showing ${filtered.length} of ${students.length} students`;
+
+    if (filtered.length === 0) {
+      document.getElementById("student-tbody").innerHTML =
+        `<tr><td colspan="9" class="empty-row">No students found.</td></tr>`;
+      return;
+    }
+
+    document.getElementById("student-tbody").innerHTML = filtered.map(s => {
+      const phases  = (s.phases || []).map(p => `<span class="chip">Phase ${p}</span>`).join(" ");
+      const created = s.createdAt?.toDate ? fmtDate(s.createdAt.toDate()) : "—";
+      const status  = s.goalLocked
+        ? `<span class="locked-icon">🔒</span> <span style="color:var(--gold-main);font-size:12px;">Locked</span>`
+        : `<span style="color:var(--text-muted);font-size:12px;">Pending</span>`;
+      const goalShort = (s.goal || "—").slice(0, 60) + ((s.goal||"").length > 60 ? "…" : "");
+      const goalBtn   = (s.goal||"").length > 60
+        ? `<br/><button class="goal-expand-btn" onclick="openGoalModal(${JSON.stringify(s.name||"")},${JSON.stringify(s.goal||"")})">Read more</button>`
+        : "";
+
+      return `<tr>
+        <td title="${s.name||""}">${s.name || "—"}</td>
+        <td title="${s.email||""}">${s.email || "—"}</td>
+        <td title="${s.role||""}">${s.role || "—"}</td>
+        <td>${s.experience || "—"}</td>
+        <td>${(s.goalPreset||"—").replace(/-/g," ")}</td>
+        <td class="goal-cell">${goalShort}${goalBtn}</td>
+        <td>${phases || "—"}</td>
+        <td>${status}</td>
+        <td style="white-space:nowrap;">${created}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  // Sort on header click
+  document.querySelectorAll("th[data-col]").forEach(th => {
+    th.addEventListener("click", () => {
+      const col = th.dataset.col;
+      if (_sortCol === col) { _sortAsc = !_sortAsc; }
+      else { _sortCol = col; _sortAsc = true; }
+      document.querySelectorAll("th[data-col]").forEach(t => t.classList.remove("sorted"));
+      th.classList.add("sorted");
+      th.querySelector(".sort-icon").textContent = _sortAsc ? "↑" : "↓";
+      renderTable(_allStudents);
+    });
+  });
+
+  // Filters
+  ["filter-search","filter-phase","filter-locked"].forEach(id => {
+    document.getElementById(id).addEventListener("input", () => renderTable(_allStudents));
+  });
+
+  // Goal modal
+  function openGoalModal(name, goal) {
+    document.getElementById("gm-title").textContent = "Learning Goal";
+    document.getElementById("gm-name").textContent  = name;
+    document.getElementById("gm-body").textContent  = goal;
+    document.getElementById("goal-modal-bg").classList.add("show");
+  }
+  function closeGoalModal(e) {
+    if (!e || e.target === document.getElementById("goal-modal-bg")) {
+      document.getElementById("goal-modal-bg").classList.remove("show");
+    }
+  }
+
+  // Excel export
+  function exportExcel() {
+    const filtered = getFiltered();
+    if (filtered.length === 0) { alert("No data to export."); return; }
+
+    const rows = filtered.map(s => ({
+      "Name":            s.name       || "",
+      "Email":           s.email      || "",
+      "Role":            s.role       || "",
+      "Experience":      s.experience || "",
+      "Hours/Week":      s.hours      || "",
+      "Goal Preset":     (s.goalPreset||"").replace(/-/g," "),
+      "AI Ambition":     s.goal       || "",
+      "Phases Selected": (s.phases||[]).join(", "),
+      "Goal Locked":     s.goalLocked ? "Yes" : "No",
+      "Enrolled Date":   s.createdAt?.toDate ? fmtDate(s.createdAt.toDate()) : "",
+      "Last Active":     s.lastActiveAt?.toDate ? fmtDate(s.lastActiveAt.toDate()) : "",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    // Column widths
+    ws["!cols"] = [20,28,24,14,12,22,50,18,12,18,18].map(w => ({ wch: w }));
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Golden Eagle Students");
+
+    const date = new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb, `Golden_Eagle_Students_${date}.xlsx`);
+  }
+
+  function fmtDate(d) {
+    return new Date(d).toLocaleDateString("en-GB", { day:"numeric", month:"short", year:"numeric" });
+  }
+
+  async function doSignOut() {
+    await signOut();
+    window.location.href = "login.html";
+  }
+</script>
+</body>
+</html>

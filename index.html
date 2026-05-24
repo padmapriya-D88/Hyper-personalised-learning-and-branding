@@ -10,6 +10,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-title" content="Golden Eagle" />
 <link rel="stylesheet" href="styles.css" />
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="auth.js"></script>
 </head>
 <body>
 
@@ -28,16 +34,41 @@
     <button data-view="dashboard" class="active">Dashboard</button>
     <button data-view="plan">Learning Plan</button>
     <button data-view="post">LinkedIn Post</button>
+    <button data-view="usage">Token Usage</button>
   </nav>
 
-  <!-- PWA install button -->
-  <div class="install-wrap" id="install-wrap" style="display:none;">
-    <button class="btn install-btn" id="install-btn" title="Install as app">
-      <span class="install-icon">⬇</span>
-      <span class="install-label">Install App</span>
-    </button>
+  <!-- Right side: user info + admin + install -->
+  <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+    <!-- Admin link (shown for admin emails only) -->
+    <a href="admin.html" class="btn secondary" id="admin-link" style="display:none; font-size:12px; padding:7px 14px; text-decoration:none;">
+      🛡 Admin
+    </a>
+
+    <!-- Signed-in user -->
+    <div class="user-chip" id="user-chip" style="display:none;">
+      <div class="user-avatar" id="user-avatar"></div>
+      <span id="user-display-name"></span>
+    </div>
+
+    <button class="btn ghost" id="sign-out-btn" style="display:none; font-size:12px; padding:7px 12px;" onclick="handleSignOut()">Sign out</button>
+
+    <!-- PWA install button -->
+    <div class="install-wrap" id="install-wrap" style="display:none;">
+      <button class="btn install-btn" id="install-btn" title="Install as app">
+        <span class="install-icon">⬇</span>
+        <span class="install-label">Install App</span>
+      </button>
+    </div>
   </div>
 </header>
+
+<!-- Auth loading screen -->
+<div id="auth-loading" style="position:fixed;inset:0;background:#080604;display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:14px;">
+  <img src="eagle-banner.png" style="width:260px;border-radius:10px;opacity:0.85;"/>
+  <div style="font-family:'Cinzel',serif;color:#d4941e;font-size:14px;letter-spacing:2px;">Loading…</div>
+  <div class="spinner" style="border:3px solid rgba(212,148,30,0.2);border-top-color:#d4941e;width:32px;height:32px;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg);}}</style>
 
 <main>
   <!-- DASHBOARD -->
@@ -73,6 +104,15 @@
     <div class="hero">
       <h1>Build your Personalised Learning Plan</h1>
       <p>Tell us about you. We'll align the 24-week Golden Eagle curriculum to your goal and current expertise.</p>
+    </div>
+
+    <!-- Shown once goal is locked -->
+    <div id="goal-locked-banner" class="goal-locked-banner hidden">
+      <span>🔒</span>
+      <div>
+        <strong>Your learning goal is saved and locked.</strong>
+        <span>Your personalised plan is shown below. Contact Padma if you need to update your goal.</span>
+      </div>
     </div>
 
     <div class="card">
@@ -259,6 +299,111 @@
 
         <h3 style="color: var(--gold-bright); font-size: 15px; margin: 24px 0 8px;">Posting schedule (next 4 weeks)</h3>
         <div id="schedule-output" class="plan-output"></div>
+      </div>
+    </div>
+  </section>
+  <!-- TOKEN USAGE DASHBOARD -->
+  <section id="view-usage" class="view">
+    <div class="hero">
+      <h1>Token Usage Dashboard</h1>
+      <p>Track every Claude API call made from this app — input &amp; output tokens consumed, cost estimates, and 14-day usage history.</p>
+    </div>
+
+    <!-- Summary cards -->
+    <div class="tu-summary-grid">
+      <div class="tu-card">
+        <div class="tu-label">API Calls</div>
+        <div class="tu-value" id="tu-calls">0</div>
+      </div>
+      <div class="tu-card">
+        <div class="tu-label">Input Tokens</div>
+        <div class="tu-value" id="tu-input">0</div>
+        <div class="tu-sub">≈ $3 / 1M tokens</div>
+      </div>
+      <div class="tu-card">
+        <div class="tu-label">Output Tokens</div>
+        <div class="tu-value" id="tu-output">0</div>
+        <div class="tu-sub">≈ $15 / 1M tokens</div>
+      </div>
+      <div class="tu-card accent">
+        <div class="tu-label">Total Tokens</div>
+        <div class="tu-value" id="tu-total-tok">0</div>
+      </div>
+      <div class="tu-card highlight">
+        <div class="tu-label">Estimated Cost</div>
+        <div class="tu-value" id="tu-cost">$0.0000</div>
+        <div class="tu-sub">Based on Claude Opus pricing</div>
+      </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="card">
+      <h2>14-Day Usage</h2>
+      <canvas id="tu-chart" width="900" height="200" style="width:100%; height:200px; display:block;"></canvas>
+      <div style="display:flex; gap:18px; margin-top:10px; font-size:12px; color:var(--text-muted);">
+        <span><span style="display:inline-block;width:10px;height:10px;background:rgba(212,148,30,0.85);border-radius:2px;margin-right:5px;"></span>Input tokens</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:rgba(240,192,64,0.90);border-radius:2px;margin-right:5px;"></span>Output tokens</span>
+      </div>
+    </div>
+
+    <!-- Pricing reference -->
+    <div class="card">
+      <h2>Claude Pricing Reference</h2>
+      <div style="overflow-x:auto;">
+        <table class="tu-table pricing-table">
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th class="num">Input ($/1M)</th>
+              <th class="num">Output ($/1M)</th>
+              <th class="num">Est. 1K calls*</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="active-model">
+              <td>claude-opus-4-7 <span class="pill">current</span></td>
+              <td class="num">$15.00</td>
+              <td class="num">$75.00</td>
+              <td class="num">~$0.090</td>
+            </tr>
+            <tr>
+              <td>claude-sonnet-4-6</td>
+              <td class="num">$3.00</td>
+              <td class="num">$15.00</td>
+              <td class="num">~$0.018</td>
+            </tr>
+            <tr>
+              <td>claude-haiku-3-5</td>
+              <td class="num">$0.80</td>
+              <td class="num">$4.00</td>
+              <td class="num">~$0.005</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">* Estimate assumes avg 1,200 input + 600 output tokens per call.</p>
+    </div>
+
+    <!-- History log -->
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h2 style="margin:0;">Call History</h2>
+        <button class="btn ghost" onclick="TokenTracker.clear()">🗑 Clear history</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="tu-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Feature</th>
+              <th>Model</th>
+              <th class="num">Input</th>
+              <th class="num">Output</th>
+              <th class="num">Cost</th>
+            </tr>
+          </thead>
+          <tbody id="tu-history"></tbody>
+        </table>
       </div>
     </div>
   </section>
