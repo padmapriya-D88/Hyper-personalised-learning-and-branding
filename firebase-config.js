@@ -13,20 +13,32 @@
 //  7. Firestore → Rules tab → paste the rules at the bottom of this file
 //  8. Save & Publish rules
 // ═══════════════════════════════════════════════════════════════════
+<script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-analytics.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
 
 const FIREBASE_CONFIG = {
-  apiKey:            "YOUR_API_KEY",
-  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId:         "YOUR_PROJECT_ID",
-  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId:             "YOUR_APP_ID",
+ apiKey: "AIzaSyBkO4eBu7tVmNflaznA23fDc32mUTHWmUY",
+    authDomain: "goldeneagle-bd362.firebaseapp.com",
+    projectId: "goldeneagle-bd362",
+    storageBucket: "goldeneagle-bd362.firebasestorage.app",
+    messagingSenderId: "942974929009",
+    appId: "1:942974929009:web:3d37430c5e00c4a44473d0",
+    measurementId: "G-R5VVVQE1R1"
 };
 
 // Emails that have admin access (can view all student data + export Excel)
 const ADMIN_EMAILS = [
   "agilebodhipvt@gmail.com",
 ];
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
+</script>
 
 // ── Firestore Security Rules (paste into Firebase Console → Firestore → Rules)
 /*
